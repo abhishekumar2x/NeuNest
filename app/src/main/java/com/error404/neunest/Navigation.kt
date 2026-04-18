@@ -25,7 +25,9 @@ fun Navigation() {
             when (key) {
                 is Screen.Explore -> NavEntry(key) {
                     val exploreViewModel = koinViewModel<ExploreViewModel>()
-                    ExploreScreen(exploreViewModel)
+                    ExploreScreen(exploreViewModel) {
+                        backStack.add(Screen.Chat(it))
+                    }
                 }
 
                 is Screen.Chat -> NavEntry(key) {
