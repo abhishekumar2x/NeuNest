@@ -10,6 +10,7 @@ kotlin = "2.3.20"
 composeBom = "2026.03.01"
 ktor = "3.4.2"
 koin-bom = "4.2.1"
+litertlmAndroid = "latest.release"
 material3 = "1.5.0-alpha17"
 nav3Core = "1.1.0"
 
@@ -37,6 +38,7 @@ koin-compose = { module = "io.insert-koin:koin-compose" }
 koin-compose-viewmodel = { module = "io.insert-koin:koin-compose-viewmodel" }
 androidx-navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "nav3Core" }
 androidx-navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "nav3Core" }
+litertlm-android = { module = "com.google.ai.edge.litertlm:litertlm-android", version.ref = "litertlmAndroid" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

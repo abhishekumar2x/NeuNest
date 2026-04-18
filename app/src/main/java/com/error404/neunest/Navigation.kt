@@ -31,7 +31,8 @@ fun Navigation() {
                 }
 
                 is Screen.Chat -> NavEntry(key) {
-
+                    val chatViewModel = koinViewModel<ChatViewModel>()
+                    ChatScreen(key.modelPath, chatViewModel)
                 }
 
                 else -> NavEntry(key) {
