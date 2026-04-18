@@ -3,8 +3,13 @@ package com.error404.neunest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,14 +18,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -34,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -72,13 +83,23 @@ fun ExploreScreen(
             contentPadding = innerPadding
         ) {
             item {
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    tonalElevation = 1.dp,
+                FlowRow(
+                    modifier = Modifier.padding(16.dp, 0.dp)
+                ) {
+                    Chip(R.drawable.ic_voltage, "${stats.voltage}V")
+                    Chip(R.drawable.ic_thermostats, "${stats.temperature}°C")
+                    Chip(R.drawable.ic_memory, "${stats.memory.first} MB / ${stats.memory.second} MB")
+                }
+            }
+            item {
+                Box(
                     modifier = Modifier
                         .padding(16.dp)
                         .fillMaxWidth()
+                        .background(
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            shape = RoundedCornerShape(24.dp),
+                        )
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp)
@@ -105,21 +126,16 @@ fun ExploreScreen(
                             enabled = !uiState.isCopying
                         ) {
                             if (uiState.isCopying) {
-                                CircularWavyProgressIndicator()
+                                CircularProgressIndicator(
+                                    progress = { uiState.copyProgress },
+                                    modifier = Modifier.size(30.dp)
+                                )
                             } else {
                                 Text("Import model")
                             }
                         }
                     }
                 }
-            }
-
-            item {
-                Text(
-                    "${stats.voltage} V\n${stats.temperature} C\n" +
-                            "${stats.memory.first}/${stats.memory.second}",
-                    modifier = Modifier.padding(16.dp, 8.dp)
-                )
             }
 
             if (uiState.models.isNotEmpty()) {
@@ -160,6 +176,12 @@ fun ExploreScreen(
                                 Column {
                                     Text(file.length().formatSize())
                                     Text(model.types.joinToString(" • "))
+                                    SuggestionChip(
+                                        onClick = { },
+                                        label = {
+                                            Text("${model.minDeviceMemoryInGb}GB RAM required")
+                                        }
+                                    )
                                 }
                             },
                             modifier = Modifier
@@ -183,6 +205,35 @@ fun ExploreScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun Chip(
+    icon: Int,
+    text: String
+) {
+    Box(
+        modifier = Modifier
+            .padding(4.dp)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.onBackground.copy(0.22f),
+                shape = CircleShape
+            )
+            .padding(16.dp, 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                painterResource(icon),
+                contentDescription = null
+            )
+            Text(text, fontSize = 14.sp)
         }
     }
 }
