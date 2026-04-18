@@ -3,6 +3,7 @@ package com.error404.neunest
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.error404.neunest.Inference.State
+import com.google.ai.edge.litertlm.Message
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -10,7 +11,7 @@ import kotlinx.coroutines.launch
 
 data class ChatUiState(
     val status: State = State.Idle,
-    val messages: List<String> = emptyList(),
+    val messages: List<Message> = emptyList(),
     val currentResponse: String = "",
     val isStreaming: Boolean = false,
 )
@@ -47,7 +48,7 @@ class ChatViewModel(
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
-                    messages = it.messages + message,
+                    messages = it.messages + Message.user(message),
                     currentResponse = "",
                     isStreaming = true
                 )
@@ -64,7 +65,7 @@ class ChatViewModel(
 
                 _uiState.update {
                     it.copy(
-                        messages = it.messages + it.currentResponse,
+                        messages = it.messages + Message.system(it.currentResponse),
                         currentResponse = "",
                         isStreaming = false
                     )
