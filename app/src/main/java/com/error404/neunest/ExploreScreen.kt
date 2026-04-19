@@ -50,7 +50,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun ExploreScreen(
     exploreViewModel: ExploreViewModel,
-    onSelectModel: (modelPath: String) -> Unit
+    onSelectModel: (name: String, modelPath: String) -> Unit
 ) {
     val context = LocalContext.current
     val uiState by exploreViewModel.uiState.collectAsState()
@@ -189,7 +189,7 @@ fun ExploreScreen(
                                 .clip(shape)
                                 .combinedClickable(
                                     onClick = {
-                                        onSelectModel(file.path)
+                                        onSelectModel(model.name, file.path)
                                     },
                                     onLongClick = {
                                         if (file.exists()) {

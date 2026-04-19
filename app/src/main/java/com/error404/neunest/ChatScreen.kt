@@ -1,16 +1,18 @@
 package com.error404.neunest
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,9 +21,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -34,12 +41,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.Role
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ChatScreen(
+    name: String,
     modelPath: String,
     chatViewModel: ChatViewModel
 ) {
@@ -50,89 +59,139 @@ fun ChatScreen(
     LaunchedEffect(modelPath) {
         chatViewModel.loadModel(modelPath)
     }
+
     DisposableEffect(Unit) {
-        onDispose {
-            chatViewModel.onDestroy()
-        }
+        onDispose { chatViewModel.onDestroy() }
     }
 
-    when (uiState.status) {
-        is Inference.State.Error -> {
-            Text("error")
+    Scaffold(
+        topBar = {
+            TopAppBar(title = { Text(name) })
         }
+    ) { padding ->
 
-        Inference.State.Idle -> {
-            Text("error")
-        }
+        when (uiState.status) {
 
-        Inference.State.Loading -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularWavyProgressIndicator()
-                    Spacer(Modifier.height(12.dp))
-                    Text("Loading model...")
+            Inference.State.Loading -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularWavyProgressIndicator()
+                        Spacer(Modifier.height(12.dp))
+                        Text("Loading model...")
+                    }
                 }
             }
-        }
 
-        Inference.State.Ready -> {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(8.dp)
-            ) {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    reverseLayout = true
+            Inference.State.Ready -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
                 ) {
-                    item {
-                        FlowRow(
-                            modifier = Modifier.padding(16.dp, 0.dp)
-                        ) {
-                            Chip(R.drawable.ic_voltage, "${stats.voltage}V")
-                            Chip(R.drawable.ic_thermostats, "${stats.temperature}°C")
-                            Chip(R.drawable.ic_memory, "${stats.memory.first} MB / ${stats.memory.second} MB")
-                        }
-                    }
-                    val allMessages = buildList {
+
+                    val messages = buildList {
                         addAll(uiState.messages)
                         if (uiState.isStreaming && uiState.currentResponse.isNotEmpty()) {
                             add(Message.system(uiState.currentResponse))
                         }
                     }
 
-                    items(allMessages.reversed()) { message ->
-                        ChatBubble(message = message)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextField(
-                        value = input,
-                        onValueChange = { input = it },
+                    LazyColumn(
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("Type a message...") }
-                    )
+                        reverseLayout = true,
+                        contentPadding = PaddingValues(8.dp)
+                    ) {
+                        items(messages.reversed()) { msg ->
+                            ChatBubble(msg)
+                        }
+                    }
 
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Button(
-                        onClick = {
+                    InputBar(
+                        input = input,
+                        onInputChange = { input = it },
+                        onSend = {
                             chatViewModel.sendMessage(input)
                             input = ""
                         },
-                        enabled = !uiState.isStreaming
-                    ) {
-                        Text("Send")
-                    }
+                        isStreaming = uiState.isStreaming,
+                        stats = stats
+                    )
+                }
+            }
+
+            else -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Something went wrong")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InputBar(
+    input: String,
+    onInputChange: (String) -> Unit,
+    onSend: () -> Unit,
+    isStreaming: Boolean,
+    stats: SystemStats
+) {
+    Surface(
+        tonalElevation = 3.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column {
+
+            AnimatedVisibility(isStreaming) {
+                Row(
+                    modifier = Modifier.padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    LoadingIndicator(Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Thinking...")
+                }
+            }
+
+            Text(
+                text = "${stats.temperature}°C • ${stats.memory.first} MB / ${stats.memory.second} MB",
+                fontSize = 12.sp,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+            )
+
+            Row(
+                modifier = Modifier
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+
+                TextField(
+                    value = input,
+                    onValueChange = onInputChange,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Message...") },
+                    maxLines = 4,
+                    shape = RoundedCornerShape(20.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    )
+                )
+
+                Spacer(Modifier.width(8.dp))
+
+                Button(
+                    onClick = onSend,
+                    enabled = input.isNotBlank() && !isStreaming,
+                    shape = RoundedCornerShape(50)
+                ) {
+                    Text("Send")
                 }
             }
         }
@@ -146,19 +205,33 @@ fun ChatBubble(message: Message) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
         Box(
             modifier = Modifier
                 .background(
-                    color = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                    shape = RoundedCornerShape(12.dp)
+                    color = if (isUser)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(
+                        topStart = 16.dp,
+                        topEnd = 16.dp,
+                        bottomStart = if (isUser) 16.dp else 4.dp,
+                        bottomEnd = if (isUser) 4.dp else 16.dp
+                    )
                 )
                 .padding(12.dp)
-                .widthIn(max = 300.dp)
+                .widthIn(max = 280.dp)
         ) {
-            Text(text = message.toString(), color = MaterialTheme.colorScheme.background)
+            Text(
+                text = message.toString(),
+                color = if (isUser)
+                    MaterialTheme.colorScheme.onPrimary
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

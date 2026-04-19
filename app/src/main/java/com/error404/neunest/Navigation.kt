@@ -11,7 +11,7 @@ import org.koin.compose.viewmodel.koinViewModel
 sealed interface Screen {
     data object Explore
 
-    data class Chat(val modelPath: String)
+    data class Chat(val name: String, val modelPath: String)
 }
 
 @Composable
@@ -25,14 +25,14 @@ fun Navigation() {
             when (key) {
                 is Screen.Explore -> NavEntry(key) {
                     val exploreViewModel = koinViewModel<ExploreViewModel>()
-                    ExploreScreen(exploreViewModel) {
-                        backStack.add(Screen.Chat(it))
+                    ExploreScreen(exploreViewModel) { name, modelPath ->
+                        backStack.add(Screen.Chat(name, modelPath))
                     }
                 }
 
                 is Screen.Chat -> NavEntry(key) {
                     val chatViewModel = koinViewModel<ChatViewModel>()
-                    ChatScreen(key.modelPath, chatViewModel)
+                    ChatScreen(key.name, key.modelPath, chatViewModel)
                 }
 
                 else -> NavEntry(key) {
