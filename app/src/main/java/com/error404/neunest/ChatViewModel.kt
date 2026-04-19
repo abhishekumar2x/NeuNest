@@ -15,6 +15,7 @@ data class ChatUiState(
     val messages: List<Message> = emptyList(),
     val currentResponse: String = "",
     val isStreaming: Boolean = false,
+    val pdfLoaded: Boolean = false,
 )
 
 class ChatViewModel(
@@ -24,42 +25,37 @@ class ChatViewModel(
     val uiState = _uiState.asStateFlow()
     private var pdfChunks: List<Chunk> = emptyList()
 
+    // ── PDF ────────────────────────────────────────────────────────────────────
+
     fun loadPdf(filePath: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val extractor = PDFDecoder()
-                val pages = extractor.extractAll(filePath).take(15)
-
-                val chunker = Chunker(maxChars = 400, overlap = 80)
-                pdfChunks = chunker.chunk(pages)
-
+                val pages = PDFDecoder().extractAll(filePath).take(20)
+                pdfChunks = Chunker(maxChars = 800, overlap = 120).chunk(pages)
+                _uiState.update { it.copy(pdfLoaded = pdfChunks.isNotEmpty()) }
             } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(currentResponse = "PDF error: ${e.message}")
-                }
+                _uiState.update { it.copy(currentResponse = "PDF error: ${e.message}") }
             }
         }
     }
 
-    init {
-        observeInference()
-    }
+    // ── Init / lifecycle ───────────────────────────────────────────────────────
+
+    init { observeInference() }
 
     private fun observeInference() {
         viewModelScope.launch {
             inference.state.collect { state ->
-                _uiState.update {
-                    it.copy(status = state)
-                }
+                _uiState.update { it.copy(status = state) }
             }
         }
     }
 
     fun loadModel(modelPath: String) {
-        viewModelScope.launch {
-            inference.loadModel(modelPath)
-        }
+        viewModelScope.launch { inference.loadModel(modelPath) }
     }
+
+    // ── Send message ───────────────────────────────────────────────────────────
 
     fun sendMessage(message: String) {
         if (message.isBlank()) return
@@ -74,40 +70,14 @@ class ChatViewModel(
             }
 
             try {
-                val retriever = KeywordRetriever()
+                val finalPrompt = buildPrompt(message)
 
-                val hits = if (pdfChunks.isNotEmpty()) {
-                    retriever.search(message, pdfChunks, k = 3)
-                } else emptyList()
-
-                val context = hits.joinToString("\n\n") {
-                    "[p${it.pageStart}] ${it.text}"
+                inference.stream(finalPrompt).collect { token ->
+                    _uiState.update { it.copy(currentResponse = it.currentResponse + token) }
                 }
 
-                val trimmedContext = context.take(1500)
-
-                val finalPrompt = if (trimmedContext.isNotBlank()) {
-                    """
-    Use the context to answer the question.
-    If not found, say "Not in document".
-
-    Context:
-    $trimmedContext
-
-    Question:
-    $message
-    """.trimIndent()
-                } else {
-                    message
-                }
-                inference.stream(finalPrompt).collect { chunk ->
-                    _uiState.update {
-                        it.copy(
-                            currentResponse = it.currentResponse + chunk
-                        )
-                    }
-                }
-
+                // Use Message.system() for assistant role — this is what LiteRT LLM SDK uses.
+                // Message.model() does NOT exist in com.google.ai.edge.litertlm.
                 _uiState.update {
                     it.copy(
                         messages = it.messages + Message.system(it.currentResponse),
@@ -118,29 +88,57 @@ class ChatViewModel(
 
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(
-                        currentResponse = "Error: ${e.message}",
-                        isStreaming = false
-                    )
+                    it.copy(currentResponse = "Error: ${e.message}", isStreaming = false)
                 }
             }
         }
     }
 
+    private fun buildPrompt(question: String): String {
+        if (pdfChunks.isEmpty()) return question
+
+        val hits = KeywordRetriever().search(question, pdfChunks, k = 3)
+
+        // Trim at chunk boundary — never mid-sentence
+        val contextParts = mutableListOf<String>()
+        var total = 0
+        for (hit in hits) {
+            val part = "[p${hit.pageStart}] ${hit.text}"
+            if (total + part.length > 1800) break
+            contextParts.add(part)
+            total += part.length
+        }
+
+        val context = contextParts.joinToString("\n\n")
+
+        // ── IMPORTANT: do NOT tell the model to say "Not found in document"
+        // when you can't guarantee the retriever found the right chunks.
+        // Instead, just give it the context and let it answer naturally.
+        // ──────────────────────────────────────────────────────────────────
+        return if (context.isNotBlank()) {
+            """
+You are a helpful assistant. Use the context excerpts below to answer the question.
+Answer as directly as possible. If the context does not contain enough information, answer from your own knowledge and say so briefly.
+
+Context:
+$context
+
+Question: $question
+            """.trimIndent()
+        } else {
+            question
+        }
+    }
+
     fun resetChat() {
         inference.resetConversation()
-
+        pdfChunks = emptyList()
         _uiState.update {
-            it.copy(
-                messages = emptyList(),
-                currentResponse = ""
-            )
+            it.copy(messages = emptyList(), currentResponse = "", pdfLoaded = false)
         }
     }
 
     fun onDestroy() {
-        viewModelScope.launch {
-            inference.close()
-        }
+        viewModelScope.launch { inference.close() }
     }
 }

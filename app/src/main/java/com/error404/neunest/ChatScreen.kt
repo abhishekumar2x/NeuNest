@@ -109,6 +109,8 @@ fun ChatScreen(
                         .padding(padding)
                 ) {
 
+                    // FIX #7: use Message.model() for the live streaming bubble,
+                    // matching the role used when the message is committed
                     val messages = buildList {
                         addAll(uiState.messages)
                         if (uiState.isStreaming && uiState.currentResponse.isNotEmpty()) {
@@ -137,6 +139,7 @@ fun ChatScreen(
                             pdfPicker.launch("application/pdf")
                         },
                         isStreaming = uiState.isStreaming,
+                        pdfLoaded = uiState.pdfLoaded,   // NEW: show PDF badge
                         stats = stats
                     )
                 }
@@ -160,6 +163,7 @@ private fun InputBar(
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
     isStreaming: Boolean,
+    pdfLoaded: Boolean,          // NEW
     stats: SystemStats,
     onPickPdf: () -> Unit,
 ) {
@@ -206,8 +210,9 @@ private fun InputBar(
 
                 Spacer(Modifier.width(8.dp))
 
+                // NEW: button label shows whether a PDF is already loaded
                 Button(onClick = onPickPdf) {
-                    Text("PDF")
+                    Text(if (pdfLoaded) "PDF ✓" else "PDF")
                 }
 
                 Spacer(Modifier.width(8.dp))
@@ -225,6 +230,8 @@ private fun InputBar(
 
 @Composable
 fun ChatBubble(message: Message) {
+    // FIX #1 (display side): model role renders on the left like system did,
+    // but isUser stays correct because we only check Role.USER
     val isUser = message.role == Role.USER
 
     Row(
