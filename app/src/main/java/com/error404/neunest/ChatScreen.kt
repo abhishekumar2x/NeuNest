@@ -44,6 +44,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.Role
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
+import java.io.File
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -55,6 +61,17 @@ fun ChatScreen(
     val uiState by chatViewModel.uiState.collectAsState()
     var input by remember { mutableStateOf("") }
     val stats by rememberSystemStats()
+
+    val context = LocalContext.current
+
+    val pdfPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            val path = uriToFile(context, it)
+            chatViewModel.loadPdf(path)
+        }
+    }
 
     LaunchedEffect(modelPath) {
         chatViewModel.loadModel(modelPath)
@@ -116,6 +133,9 @@ fun ChatScreen(
                             chatViewModel.sendMessage(input)
                             input = ""
                         },
+                        onPickPdf = {
+                            pdfPicker.launch("application/pdf")
+                        },
                         isStreaming = uiState.isStreaming,
                         stats = stats
                     )
@@ -140,7 +160,8 @@ private fun InputBar(
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
     isStreaming: Boolean,
-    stats: SystemStats
+    stats: SystemStats,
+    onPickPdf: () -> Unit,
 ) {
     Surface(
         tonalElevation = 3.dp,
@@ -166,8 +187,7 @@ private fun InputBar(
             )
 
             Row(
-                modifier = Modifier
-                    .padding(8.dp),
+                modifier = Modifier.padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
 
@@ -186,10 +206,15 @@ private fun InputBar(
 
                 Spacer(Modifier.width(8.dp))
 
+                Button(onClick = onPickPdf) {
+                    Text("PDF")
+                }
+
+                Spacer(Modifier.width(8.dp))
+
                 Button(
                     onClick = onSend,
-                    enabled = input.isNotBlank() && !isStreaming,
-                    shape = RoundedCornerShape(50)
+                    enabled = input.isNotBlank() && !isStreaming
                 ) {
                     Text("Send")
                 }
@@ -234,4 +259,17 @@ fun ChatBubble(message: Message) {
             )
         }
     }
+}
+
+fun uriToFile(context: Context, uri: Uri): String {
+    val inputStream = context.contentResolver.openInputStream(uri)
+        ?: throw IllegalStateException("Cannot open PDF")
+
+    val file = File.createTempFile("picked_pdf", ".pdf", context.cacheDir)
+
+    file.outputStream().use { output ->
+        inputStream.copyTo(output)
+    }
+
+    return file.absolutePath
 }

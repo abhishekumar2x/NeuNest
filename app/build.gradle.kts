@@ -70,4 +70,6 @@ dependencies {
     implementation(libs.koin.compose.viewmodel)
 
     implementation(libs.litertlm.android)
+
+    implementation(libs.pdfbox.android)
 }
